@@ -1,0 +1,7 @@
+{
+  "category": "stat.CO",
+  "max_results": 200,
+  "state_file": "arxiv_state.json",
+  "history_file": "arxiv_history.jsonl",
+  "new_file": "arxiv_new.jsonl"
+}

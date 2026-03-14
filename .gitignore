@@ -1,0 +1,8 @@
+# arXiv tracker data and state
+arxiv_history.jsonl
+arxiv_new.jsonl
+arxiv_state.json
+
+# Python environment and cache
+__pycache__/
+venv/
