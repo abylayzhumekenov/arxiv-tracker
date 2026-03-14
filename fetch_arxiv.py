@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch STAT.CO (or any arXiv category) new papers and save JSONL history + delta.
+"""Fetch STAT.CO (or any arXiv category) new papers and save JSON history + delta.
 
 Usage:
     pip install arxiv
@@ -7,8 +7,8 @@ Usage:
 
 Outputs:
    arxiv_state.json
-   arxiv_history.jsonl
-   arxiv_new.jsonl
+   arxiv_history.json
+   arxiv_new.json
 
 Each record:
    id, arxiv_id, title, abstract, authors, institutions (empty), published,
@@ -29,8 +29,8 @@ import arxiv
 DEFAULT_CATEGORIES = "stat.CO"
 DEFAULT_MAX_RESULTS = 200
 DEFAULT_STATE_FILE = "arxiv_state.json"
-DEFAULT_HISTORY_FILE = "arxiv_history.jsonl"
-DEFAULT_NEW_FILE = "arxiv_new.jsonl"
+DEFAULT_HISTORY_FILE = "arxiv_history.json"
+DEFAULT_NEW_FILE = "arxiv_new.json"
 DEFAULT_CONFIG_FILE = "config.json"
 
 def load_config(path: Path) -> Dict[str, Any]:
@@ -51,8 +51,8 @@ def parse_args(config: Dict[str, Any]) -> argparse.Namespace:
     p.add_argument("--category", default=config.get("category", DEFAULT_CATEGORIES), help="Comma-separated arXiv categories")
     p.add_argument("--max-results", type=int, default=config.get("max_results", DEFAULT_MAX_RESULTS), help="Max results to fetch per category")
     p.add_argument("--state-file", default=config.get("state_file", DEFAULT_STATE_FILE), help="State filename")
-    p.add_argument("--history-file", default=config.get("history_file", DEFAULT_HISTORY_FILE), help="History jsonl filename")
-    p.add_argument("--new-file", default=config.get("new_file", DEFAULT_NEW_FILE), help="New jsonl filename")
+    p.add_argument("--history-file", default=config.get("history_file", DEFAULT_HISTORY_FILE), help="History json filename")
+    p.add_argument("--new-file", default=config.get("new_file", DEFAULT_NEW_FILE), help="New json filename")
     p.add_argument("--reset", action="store_true", help="Reset state and treat all fetched as new")
     return p.parse_args()
 
@@ -74,7 +74,7 @@ def to_iso(dt: Any) -> str:
 def paper_to_dict(entry: arxiv.Result) -> Dict[str, Any]:
     return {
         "id": entry.entry_id,
-        "arxiv_id": entry.get_short_id(),
+        "arxiv_id": entry.entry_id.split('/')[-1],
         "title": (entry.title or "").strip(),
         "abstract": (entry.summary or "").strip(),
         "authors": [a.name for a in entry.authors],
@@ -89,11 +89,22 @@ def paper_to_dict(entry: arxiv.Result) -> Dict[str, Any]:
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
 
-def append_jsonl(path: Path, items: List[Dict[str, Any]]) -> None:
-    with path.open("a", encoding="utf-8") as f:
-        for item in items:
-            f.write(json.dumps(item, ensure_ascii=False) + "\n")
+def save_json(path: Path, items: List[Dict[str, Any]]) -> None:
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(items, f, indent=2, ensure_ascii=False)
 
+def update_history_json(path: Path, new_items: List[Dict[str, Any]]) -> None:
+    history = []
+    if path.exists():
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                history = json.load(f)
+                if not isinstance(history, list):
+                    history = []
+        except Exception:
+            history = []
+    history.extend(new_items)
+    save_json(path, history)
 
 def main():
     config_data = load_config(Path(DEFAULT_CONFIG_FILE))
@@ -115,10 +126,6 @@ def main():
     client = arxiv.Client()
     all_new_papers = []
     seen_ids = set()
-
-    # Clear the "new" file at the start of the run
-    with new_path.open("w", encoding="utf-8") as f:
-        pass
 
     for cat in categories:
         cat_state = state["categories"].get(cat, {})
@@ -165,8 +172,8 @@ def main():
             print(f"Found {len(cat_new)} new papers ({len(unique_new)} unique in this run).")
 
     if all_new_papers:
-        append_jsonl(new_path, all_new_papers)
-        append_jsonl(history_path, all_new_papers)
+        save_json(new_path, all_new_papers)
+        update_history_json(history_path, all_new_papers)
         save_state(state_path, state)
         print(f"\nTotal new unique papers: {len(all_new_papers)}")
         print(f"Updated {new_path} and {history_path}")

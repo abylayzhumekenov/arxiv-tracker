@@ -1,0 +1,50 @@
+{
+  "research_directions": [
+    {
+      "direction": "Scalable Bayesian Computation for High-Dimensional Models",
+      "topics": [
+        "parallel selected inversion",
+        "rao-blackwellized monte carlo",
+        "distributed krylov methods",
+        "domain decomposition for precision matrices"
+      ]
+    },
+    {
+      "direction": "Robust Filtering with Low or Degenerate Observation Noise",
+      "topics": [
+        "sequential markov chain monte carlo",
+        "particle filtering",
+        "low noise filtering",
+        "manifold sampling"
+      ]
+    },
+    {
+      "direction": "Generative and Physics-Informed Machine Learning for Scientific Computing",
+      "topics": [
+        "diffusion models",
+        "physics-informed guidance",
+        "generative pde solvers",
+        "particle-based sampling"
+      ]
+    },
+    {
+      "direction": "Foundations of Inference via Optimal Transport and Variational Methods",
+      "topics": [
+        "schrödinger bridge",
+        "sinkhorn algorithm",
+        "variational inference",
+        "optimal transport"
+      ]
+    },
+    {
+      "direction": "Prior-Free Bayesian Methods and Uncertainty Quantification",
+      "topics": [
+        "martingale posterior",
+        "score function",
+        "uncertainty quantification",
+        "prior-free inference"
+      ]
+    }
+  ],
+  "overall_summary": "My research develops scalable computational methods for Bayesian inference, with expertise in numerical linear algebra for spatio-temporal models. I am now extending these foundations toward generative and physics-informed machine learning, focusing on robust uncertainty quantification and connections between classical Monte Carlo methods and modern deep learning approaches."
+}

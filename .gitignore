@@ -1,8 +1,14 @@
-# arXiv tracker data and state
-arxiv_history.jsonl
-arxiv_new.jsonl
-arxiv_state.json
-
-# Python environment and cache
 __pycache__/
+*.py[cod]
 venv/
+.venv/
+
+# Generated data and state files
+arxiv_state.json
+arxiv_history.json
+arxiv_history.jsonl
+arxiv_new.json
+arxiv_new.jsonl
+
+# OS specific files
+.DS_Store

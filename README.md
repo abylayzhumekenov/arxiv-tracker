@@ -1,22 +1,23 @@
 # arxiv-tracker
 
-A small Python utility to track new arXiv papers in a category (e.g., `stat.CO`), keep history, and produce delta output for manual review or LLM ingestion.
+A streamlined tool to track new arXiv papers, maintain a local database, and filter results using LLMs based on your specific research directions.
 
 ## Features
 
 - Uses the `arxiv` Python library and arXiv API
 - Stateful run tracking (`arxiv_state.json`) to only capture newly published papers
-- Saves full cumulative history in `arxiv_history.jsonl`
-- Saves only newly found papers each run in `arxiv_new.jsonl`
+- Saves full cumulative history in `arxiv_history.json`
+- Saves only newly found papers each run in `arxiv_new.json`
 - Includes key metadata fields (authors, title, abstract, categories, DOI, etc.)
 
 ## Files
 
 - `fetch_arxiv.py` : main script
 - `config.json` : configuration file for categories and settings
+- `research_interests.json` : (User defined) Your specific research focus and keywords
 - `arxiv_state.json` : state file with `last_run` and total counter
-- `arxiv_history.jsonl` : append-only JSONL history
-- `arxiv_new.jsonl` : JSONL snapshot containing only papers from the latest run
+- `arxiv_history.json` : cumulative JSON history
+- `arxiv_new.json` : JSON snapshot containing only papers from the latest run
 
 ## Setup
 
@@ -52,11 +53,16 @@ CLI options:
 
 ## Example workflow
 
-1. Run regularly (daily/weekly). 2. `arxiv_new.jsonl` has new papers since last run. 3. Feed into your LLM prompt with your fixed keywords file (e.g. `research_keywords.txt`) for relevance classification.
+1. Run regularly (daily/weekly).
+2. `arxiv_new.json` contains new papers since the last run.
+3. Upload `arxiv_new.json` and `research_interests.json` to your LLM.
+
+### Suggested LLM Prompt
+> "I've uploaded `arxiv_new.json` (recent papers) and `research_interests.json` (my nested research interests). Please filter the new papers and highlight the most relevant ones. Organize your response according to the 'research_directions' I've defined, explaining why each paper fits that specific direction and its preferred topics."
 
 ## Output format
 
-Each line in JSONL has fields:
+The output is a JSON array of objects with fields:
 
 - `id`, `arxiv_id`, `title`, `abstract`, `authors`, `institutions`, `published`, `updated`, `categories`, `doi`, `journal_ref`, `comment`, `keywords`, `fetched_at`
 
