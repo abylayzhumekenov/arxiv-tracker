@@ -39,7 +39,12 @@ The workflow is a simple two-step process:
 ## Prerequisites
 
 - Python 3.8+
-- Ollama installed and running.
+- **Ollama**:
+  - **macOS / Linux**: 
+    ```bash
+    curl -fsSL https://ollama.com/install.sh | sh
+    ```
+  - **Windows**: Download from ollama.com.
 - An embedding model pulled via Ollama. We recommend `nomic-embed-text`:
   ```bash
   ollama pull nomic-embed-text
@@ -49,7 +54,7 @@ The workflow is a simple two-step process:
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/arxiv-tracker.git
+    git clone https://github.com/abylayzhumekenov/arxiv-tracker.git
     cd arxiv-tracker
     ```
 
