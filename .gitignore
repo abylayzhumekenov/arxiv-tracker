@@ -1,14 +1,17 @@
-__pycache__/
-*.py[cod]
+# Python virtual environment
 venv/
 .venv/
 
-# Generated data and state files
-arxiv_state.json
-arxiv_history.json
-arxiv_history.jsonl
-arxiv_new.json
-arxiv_new.jsonl
+# Python cache files
+__pycache__/
+*.pyc
 
-# OS specific files
+# IDE configuration
+.idea/
+.vscode/
+
+# Generated data files from scripts
+arxiv_*.json
+
+# OS-specific files
 .DS_Store

@@ -1,66 +1,120 @@
-# arxiv-tracker
+# arXiv Tracker
 
-A streamlined tool to track new arXiv papers, maintain a local database, and filter results using LLMs based on your specific research directions.
+A streamlined tool to track new arXiv papers, maintain a local database, and semantically filter results based on your specific research interests using local language models.
 
 ## Features
 
-- Uses the `arxiv` Python library and arXiv API
-- Stateful run tracking (`arxiv_state.json`) to only capture newly published papers
-- Saves full cumulative history in `arxiv_history.json`
-- Saves only newly found papers each run in `arxiv_new.json`
-- Includes key metadata fields (authors, title, abstract, categories, DOI, etc.)
+- **Stateful Fetching**: Uses the `arxiv` library to fetch new papers since the last run, avoiding duplicates.
+- **Local Database**: Saves a full history of fetched papers (`arxiv_history.json`) and a snapshot of the latest additions (`arxiv_new.json`).
+- **Semantic Filtering**: Ranks new papers by relevance to your research interests using local sentence embeddings via Ollama. No API keys or costs required.
+- **Configurable**: Easily configure tracked arXiv categories, filenames, and filtering parameters in a central `config.json`.
+- **Informative Output**: The filter script provides a clean, ranked summary of the most relevant papers directly in your terminal.
+- **Robust Workflow**: Scripts are designed to work together, ensuring a smooth pipeline from fetching to filtering.
 
-## Files
+## File Overview
 
-- `fetch_arxiv.py` : main script
-- `config.json` : configuration file for categories and settings
-- `research_interests.json` : (User defined) Your specific research focus and keywords
-- `arxiv_state.json` : state file with `last_run` and total counter
-- `arxiv_history.json` : cumulative JSON history
-- `arxiv_new.json` : JSON snapshot containing only papers from the latest run
+-   **Core Scripts**: `fetch_arxiv.py`, `filter_papers.py`
+-   **Configuration (Tracked by Git)**:
+    -   `config.json`: Main settings for categories, file paths, and filtering.
+    -   `research_interests.json`: Your specific research topics for semantic filtering.
+-   **Generated Data (Ignored by `.gitignore`)**:
+    -   `arxiv_state.json`: Tracks the last run time to prevent duplicate fetching.
+    -   `arxiv_history.json`: A cumulative database of all papers fetched.
+    -   `arxiv_new.json`: Contains only the papers from the most recent fetch.
+    -   `arxiv_filtered.json`: The output of the filtering script, containing relevant papers.
+
+## How It Works
+
+The workflow is a simple two-step process:
+
+1.  **`fetch_arxiv.py`**: Connects to the arXiv API, fetches papers from your specified categories that were published since the last run, and saves them to `arxiv_new.json` and `arxiv_history.json`.
+2.  **`filter_papers.py`**:
+    *   Loads your defined research interests from `research_interests.json`.
+    *   Loads the newly fetched papers from `arxiv_new.json`.
+    *   Uses a local Ollama model (like `nomic-embed-text`) to generate vector embeddings for your interests and the papers' titles/abstracts.
+    *   Calculates the cosine similarity to score each paper's relevance.
+    *   Saves a sorted list of relevant papers to `arxiv_filtered.json` and prints a summary.
+
+## Prerequisites
+
+- Python 3.8+
+- Ollama installed and running.
+- An embedding model pulled via Ollama. We recommend `nomic-embed-text`:
+  ```bash
+  ollama pull nomic-embed-text
+  ```
 
 ## Setup
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/arxiv-tracker.git
-   cd arxiv-tracker
-   ```
-2. Create and activate a virtual environment (recommended):
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On macOS/Linux
-   # venv\Scripts\activate   # On Windows
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/arxiv-tracker.git
+    cd arxiv-tracker
+    ```
+
+2.  **Create and activate a virtual environment (recommended):**
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate  # On macOS/Linux
+    # venv\Scripts\activate   # On Windows
+    ```
+
+3.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## Configuration
+
+Before running, customize the following two files:
+
+1.  **`config.json`**: Set your desired arXiv categories and filtering preferences.
+    ```json
+    {
+      "category": "cs.LG,stat.ML",
+      "max_results": 200,
+      "ollama_model": "nomic-embed-text",
+      "relevance_threshold": 0.5
+    }
+    ```
+
+2.  **`research_interests.json`**: Define your research interests. The filter script will use these to calculate relevance.
+    ```json
+    {
+      "research_directions": [
+        {
+          "direction": "Scalable Bayesian Computation",
+          "topics": ["MCMC", "variational inference", "high-dimensional models"]
+        }
+      ],
+      "overall_summary": "My research focuses on..."
+    }
+    ```
 
 ## Usage
 
-The script uses settings from `config.json` by default. This allows you to customize the tracked categories without editing the script or using command line flags.
+Run the scripts in sequence.
 
-### Command line override
-
+**Step 1: Fetch New Papers**
 ```bash
-python3 fetch_arxiv.py --category stat.CO,stat.ML,cs.LG --max-results 200
+python3 fetch_arxiv.py
+```
+This will update `arxiv_new.json` with the latest papers.
+
+**Step 2: Filter for Relevance**
+```bash
+python3 filter_papers.py
 ```
 
-CLI options:
+**2. Filter all historical papers:**
+```bash
+python3 filter_papers.py --use-history
+```
 
-- `--category` : arXiv category (default `stat.CO`)
-- `--max-results` : max entries to fetch per run (default `200`)
-- `--state-file` : override state file path
-- `--history-file` : override history file path
-- `--new-file` : override new file path
-- `--reset` : ignore prior state and treat fetched set as new
-
-## Example workflow
-
-1. Run regularly (daily/weekly).
-2. `arxiv_new.json` contains new papers since the last run.
-3. Upload `arxiv_new.json` and `research_interests.json` to your LLM.
+You can override settings from `config.json` via the command line:
+```bash
+python3 filter_papers.py --threshold 0.6 --model other-embedding-model
+```
 
 ### Suggested LLM Prompt
 > "I've uploaded `arxiv_new.json` (recent papers) and `research_interests.json` (my nested research interests). Please filter the new papers and highlight the most relevant ones. Organize your response according to the 'research_directions' I've defined, explaining why each paper fits that specific direction and its preferred topics."

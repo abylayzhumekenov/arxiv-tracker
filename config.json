@@ -3,5 +3,8 @@
   "max_results": 200,
   "state_file": "arxiv_state.json",
   "history_file": "arxiv_history.json",
-  "new_file": "arxiv_new.json"
+  "new_file": "arxiv_new.json",
+  "ollama_model": "nomic-embed-text",
+  "ollama_url": "http://localhost:11434",
+  "relevance_threshold": 0.7
 }

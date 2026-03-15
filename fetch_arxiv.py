@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
-"""Fetch STAT.CO (or any arXiv category) new papers and save JSON history + delta.
+"""Fetch new papers from arXiv based on categories and save them.
 
 Usage:
-    pip install arxiv
     python fetch_arxiv.py --category stat.CO --max-results 200
 
-Outputs:
-   arxiv_state.json
-   arxiv_history.json
-   arxiv_new.json
-
-Each record:
-   id, arxiv_id, title, abstract, authors, institutions (empty), published,
-   updated, categories, doi, journal_ref, comment, keywords, fetched_at
+This script uses a layered configuration system with the following priority:
+1. Command-line arguments (e.g., --category)
+2. Settings in config.json (e.g., "category": "cs.LG")
+3. Hardcoded default values in this script (failsafe).
 """
 
 import argparse
@@ -178,8 +173,10 @@ def main():
         print(f"\nTotal new unique papers: {len(all_new_papers)}")
         print(f"Updated {new_path} and {history_path}")
     else:
-        print("No new papers since last run.")
-
+        print("\nNo new papers found since last run.")
+        # Ensure the new_file is an empty list for downstream tasks
+        save_json(new_path, [])
+        print(f"Created/cleared {new_path} to ensure pipeline consistency.")
 
 if __name__ == "__main__":
     main()
