@@ -22,10 +22,11 @@ from tqdm import tqdm
 DEFAULT_CONFIG_FILE = "config.json"
 DEFAULT_MODEL = "nomic-embed-text"
 DEFAULT_URL = "http://localhost:11434"
-DEFAULT_THRESHOLD = 0.7
+DEFAULT_THRESHOLD = 0.6
 DEFAULT_OUTPUT_FILE = "arxiv_filtered.json"
 DEFAULT_INTERESTS_FILE = "research_interests.json"
 DEFAULT_TOP_N = 10
+DEFAULT_TOPIC_WEIGHT = 0.7
 
 
 def get_embedding(text: str, model: str, url: str) -> np.ndarray:
@@ -85,25 +86,29 @@ def parse_args(config: Dict[str, Any]) -> argparse.Namespace:
     parser.add_argument("--threshold", type=float, default=config.get("relevance_threshold", DEFAULT_THRESHOLD), help="Similarity threshold (from config: relevance_threshold)")
     parser.add_argument("--use-history", action="store_true", help="Filter from the history file instead of new papers")
     parser.add_argument("--top-n", type=int, default=DEFAULT_TOP_N, help="Number of top papers to display in summary")
+    parser.add_argument("--topic-weight", type=float, default=config.get("topic_weight", DEFAULT_TOPIC_WEIGHT), help="Weight for topics vs direction (0.0 to 1.0)")
     return parser.parse_args()
 
-def print_summary(papers: List[Dict[str, Any]], top_n: int):
-    """Prints a summary table of the top N papers."""
+def generate_summary(papers: List[Dict[str, Any]], top_n: int) -> str:
+    """Generates a summary string of the top N papers."""
     if not papers:
-        return
+        return "No relevant papers found."
 
-    print(f"\n--- Top {min(top_n, len(papers))} Relevant Papers ---")
+    lines = []
+    lines.append(f"--- Top {min(top_n, len(papers))} Relevant Papers ---")
 
     for i, paper in enumerate(papers):
         if i >= top_n:
             break
 
-        title = paper.get('title', '')
+        title = paper.get('title', '').replace('\n', ' ')
         authors = ", ".join(paper.get('authors', []))
         score = f"{paper.get('relevance_score', 0.0):.3f}"
         interest = paper.get('matched_interest', 'N/A')
 
-        print(f"\n[{i+1}] Score: {score} | Matched: {interest}\n    Title: {title}\n    Authors: {authors}")
+        lines.append(f"\n[{i+1}] Score: {score} | Matched: {interest}\n    Title: {title}\n    Authors: {authors}")
+    
+    return "\n".join(lines)
 
 def main():
     config_data = load_config(Path(DEFAULT_CONFIG_FILE))
@@ -132,13 +137,22 @@ def main():
     
     # Prepare interest vectors
     # We treat research directions as "queries" (search_query prefix is often used with Nomic)
-    interest_vectors = []
+    interest_profiles = []
     for item in interests_data.get("research_directions", []):
-        text = f"search_query: {item['direction']} " + ", ".join(item.get("topics", []))
-        vector = get_embedding(text, args.model, args.url)
-        interest_vectors.append((item['direction'], vector))
+        # Embedding 1: The general direction
+        dir_text = f"search_query: {item['direction']}"
+        dir_vec = get_embedding(dir_text, args.model, args.url)
+        
+        # Embedding 2: The specific topics
+        topics_str = ", ".join(item.get("topics", []))
+        topic_vec = None
+        if topics_str:
+            topic_text = f"search_query: {topics_str}"
+            topic_vec = get_embedding(topic_text, args.model, args.url)
+            
+        interest_profiles.append({"label": item['direction'], "dir_vec": dir_vec, "topic_vec": topic_vec})
 
-    print(f"Computed embeddings for {len(interest_vectors)} research directions.")
+    print(f"Computed embeddings for {len(interest_profiles)} research directions.")
     print(f"Processing {len(papers)} papers...")
 
     filtered_papers = []
@@ -151,11 +165,18 @@ def main():
         best_score = -1.0
         best_match = "None"
 
-        for label, int_vec in interest_vectors:
-            score = cosine_similarity(paper_vec, int_vec)
-            if score > best_score:
-                best_score = score
-                best_match = label
+        for interest in interest_profiles:
+            score_dir = cosine_similarity(paper_vec, interest["dir_vec"])
+            
+            if interest["topic_vec"] is not None:
+                score_topics = cosine_similarity(paper_vec, interest["topic_vec"])
+                final_score = (score_topics * args.topic_weight) + (score_dir * (1.0 - args.topic_weight))
+            else:
+                final_score = score_dir
+                
+            if final_score > best_score:
+                best_score = final_score
+                best_match = interest["label"]
         
         if best_score >= args.threshold:
             paper["relevance_score"] = float(best_score)
@@ -168,8 +189,14 @@ def main():
     save_json(output_path, filtered_papers)
     print(f"\nSaved {len(filtered_papers)} relevant papers to {output_path}")
 
-    # Display summary of top papers
-    print_summary(filtered_papers, args.top_n)
+    # Generate, print, and save summary
+    summary_text = generate_summary(filtered_papers, args.top_n)
+    print("\n" + summary_text)
+    
+    summary_path = output_path.with_suffix(".txt")
+    with summary_path.open("w", encoding="utf-8") as f:
+        f.write(summary_text)
+    print(f"Saved summary text to {summary_path}")
 
 if __name__ == "__main__":
     main()

@@ -12,6 +12,7 @@ __pycache__/
 
 # Generated data files from scripts
 arxiv_*.json
+arxiv_*.txt
 
 # OS-specific files
 .DS_Store

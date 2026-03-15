@@ -22,6 +22,7 @@ A streamlined tool to track new arXiv papers, maintain a local database, and sem
     -   `arxiv_history.json`: A cumulative database of all papers fetched.
     -   `arxiv_new.json`: Contains only the papers from the most recent fetch.
     -   `arxiv_filtered.json`: The output of the filtering script, containing relevant papers.
+    -   `arxiv_filtered.txt`: A text summary of the top papers (human-readable).
 
 ## How It Works
 
@@ -32,7 +33,7 @@ The workflow is a simple two-step process:
     *   Loads your defined research interests from `research_interests.json`.
     *   Loads the newly fetched papers from `arxiv_new.json`.
     *   Uses a local Ollama model (like `nomic-embed-text`) to generate vector embeddings for your interests and the papers' titles/abstracts.
-    *   Calculates the cosine similarity to score each paper's relevance.
+    *   Calculates relevance scores, weighing specific "topics" against the general research "direction" (configurable).
     *   Saves a sorted list of relevant papers to `arxiv_filtered.json` and prints a summary.
 
 ## Prerequisites
@@ -74,7 +75,8 @@ Before running, customize the following two files:
       "category": "cs.LG,stat.ML",
       "max_results": 200,
       "ollama_model": "nomic-embed-text",
-      "relevance_threshold": 0.5
+      "relevance_threshold": 0.6,
+      "topic_weight": 0.7
     }
     ```
 
@@ -113,7 +115,7 @@ python3 filter_papers.py --use-history
 
 You can override settings from `config.json` via the command line:
 ```bash
-python3 filter_papers.py --threshold 0.6 --model other-embedding-model
+python3 filter_papers.py --threshold 0.6 --topic-weight 0.8
 ```
 
 ### Suggested LLM Prompt
