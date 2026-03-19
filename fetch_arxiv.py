@@ -14,7 +14,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -48,7 +48,9 @@ def parse_args(config: Dict[str, Any]) -> argparse.Namespace:
     p.add_argument("--state-file", default=config.get("state_file", DEFAULT_STATE_FILE), help="State filename")
     p.add_argument("--history-file", default=config.get("history_file", DEFAULT_HISTORY_FILE), help="History json filename")
     p.add_argument("--new-file", default=config.get("new_file", DEFAULT_NEW_FILE), help="New json filename")
-    p.add_argument("--reset", action="store_true", help="Reset state and treat all fetched as new")
+    p.add_argument("--reset", action="store_true", help="Reset state (ignore last run time) but keep history")
+    p.add_argument("--clear-history", action="store_true", help="Delete the existing history file before fetching")
+    p.add_argument("--days", type=int, help="Fetch papers from the last N days (overrides state)")
     return p.parse_args()
 
 def load_state(path: Path) -> Dict[str, Any]:
@@ -74,6 +76,7 @@ def paper_to_dict(entry: arxiv.Result) -> Dict[str, Any]:
         "abstract": (entry.summary or "").strip(),
         "authors": [a.name for a in entry.authors],
         "institutions": [],
+        "primary_category": entry.primary_category,
         "published": to_iso(entry.published),
         "updated": to_iso(entry.updated),
         "categories": entry.categories,
@@ -98,7 +101,16 @@ def update_history_json(path: Path, new_items: List[Dict[str, Any]]) -> None:
                     history = []
         except Exception:
             history = []
-    history.extend(new_items)
+
+    # Deduplicate based on paper ID
+    existing_ids = {item.get("id") for item in history}
+    added_count = 0
+    for item in new_items:
+        if item.get("id") not in existing_ids:
+            history.append(item)
+            added_count += 1
+            
+    print(f"Appended {added_count} new papers to history (skipped {len(new_items) - added_count} duplicates).")
     save_json(path, history)
 
 def main():
@@ -107,6 +119,10 @@ def main():
     state_path = Path(args.state_file)
     history_path = Path(args.history_file)
     new_path = Path(args.new_file)
+
+    if args.clear_history and history_path.exists():
+        print(f"Clearing history file: {history_path}")
+        history_path.unlink()
 
     categories = [c.strip() for c in args.category.split(",")]
     state = {} if args.reset else load_state(state_path)
@@ -124,13 +140,19 @@ def main():
 
     for cat in categories:
         cat_state = state["categories"].get(cat, {})
-        last_run = cat_state.get("last_run")
-        print(f"\n--- Checking category: {cat} (last_run: {last_run or 'Never'}) ---")
+        
+        if args.days is not None:
+            cutoff_dt = datetime.now(timezone.utc) - timedelta(days=args.days)
+            last_run = to_iso(cutoff_dt)
+            print(f"\n--- Checking category: {cat} (Overridden by --days {args.days}: since {last_run}) ---")
+        else:
+            last_run = cat_state.get("last_run")
+            print(f"\n--- Checking category: {cat} (last_run: {last_run or 'Never'}) ---")
 
         search = arxiv.Search(
             query=f"cat:{cat}",
             max_results=args.max_results,
-            sort_by=arxiv.SortCriterion.SubmittedDate,
+            sort_by=arxiv.SortCriterion.LastUpdatedDate,
         )
 
         try:
@@ -143,10 +165,10 @@ def main():
             continue
 
         papers = [paper_to_dict(e) for e in entries]
-        papers.sort(key=lambda x: x["published"], reverse=True)
+        papers.sort(key=lambda x: x["updated"], reverse=True)
 
         if last_run:
-            cat_new = [p for p in papers if p["published"] > last_run]
+            cat_new = [p for p in papers if p["updated"] > last_run]
         else:
             cat_new = papers
 
@@ -160,7 +182,7 @@ def main():
         if cat_new:
             # Update state for this specific category
             state["categories"][cat] = {
-                "last_run": cat_new[0]["published"],
+                "last_run": cat_new[0]["updated"],
                 "total_fetched": cat_state.get("total_fetched", 0) + len(cat_new)
             }
             all_new_papers.extend(unique_new)

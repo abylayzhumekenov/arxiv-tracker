@@ -89,7 +89,7 @@ def parse_args(config: Dict[str, Any]) -> argparse.Namespace:
     parser.add_argument("--topic-weight", type=float, default=config.get("topic_weight", DEFAULT_TOPIC_WEIGHT), help="Weight for topics vs direction (0.0 to 1.0)")
     return parser.parse_args()
 
-def generate_summary(papers: List[Dict[str, Any]], top_n: int) -> str:
+def generate_summary(papers: List[Dict[str, Any]], top_n: int, tracked_cats: List[str] = None) -> str:
     """Generates a summary string of the top N papers."""
     if not papers:
         return "No relevant papers found."
@@ -105,8 +105,20 @@ def generate_summary(papers: List[Dict[str, Any]], top_n: int) -> str:
         authors = ", ".join(paper.get('authors', []))
         score = f"{paper.get('relevance_score', 0.0):.3f}"
         interest = paper.get('matched_interest', 'N/A')
+        
+        # Determine status: New, Replaced, or Cross-list
+        status = "New"
+        if paper.get("published") != paper.get("updated"):
+            status = "Replaced"
+        elif tracked_cats:
+            # Check if primary category is in our tracked list
+            prim_cat = paper.get("primary_category")
+            if not prim_cat and paper.get("categories"):
+                prim_cat = paper.get("categories")[0]
+            if prim_cat and prim_cat not in tracked_cats:
+                status = "Cross-list"
 
-        lines.append(f"\n[{i+1}] Score: {score} | Matched: {interest}\n    Title: {title}\n    Authors: {authors}")
+        lines.append(f"\n[{i+1}] Score: {score} | {status} | Matched: {interest}\n    Title: {title}\n    Authors: {authors}")
     
     return "\n".join(lines)
 
@@ -189,8 +201,12 @@ def main():
     save_json(output_path, filtered_papers)
     print(f"\nSaved {len(filtered_papers)} relevant papers to {output_path}")
 
+    # Prepare tracked categories for status detection
+    cat_str = config_data.get("category", "")
+    tracked_cats = [c.strip() for c in cat_str.split(",")] if cat_str else []
+
     # Generate, print, and save summary
-    summary_text = generate_summary(filtered_papers, args.top_n)
+    summary_text = generate_summary(filtered_papers, args.top_n, tracked_cats)
     print("\n" + summary_text)
     
     summary_path = output_path.with_suffix(".txt")
